@@ -1,0 +1,12 @@
+.DS_Store
+.env
+.env.local
+_*
+*.tar
+coverage.txt
+coverage.out
+coverage.html
+debug.test
+main
+main.zip
+/mcp-confluence
