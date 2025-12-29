@@ -1,4 +1,4 @@
-# mcp-confluence
+# MCP Server for Confluence
 
 [![Build Status][build-status-svg]][build-status-url]
 [![Lint Status][lint-status-svg]][lint-status-url]
