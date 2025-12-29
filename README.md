@@ -36,6 +36,14 @@ This library provides:
 
 ## Installation
 
+### MCP Server Binary
+
+```bash
+go install github.com/agentplexus/mcp-confluence/cmd/mcp-confluence@latest
+```
+
+### As a Library
+
 ```bash
 go get github.com/agentplexus/mcp-confluence
 ```
@@ -107,11 +115,11 @@ err = client.UpdatePageStorage(ctx, info.ID, page, info.Version, info.Title)
 ### Running the MCP Server
 
 ```bash
-# Build the server
-go build -o mcp-confluence ./cmd/mcp-confluence
+# Install from GitHub
+go install github.com/agentplexus/mcp-confluence/cmd/mcp-confluence@latest
 
-# Or use make
-make build
+# Or build from source
+go build -o mcp-confluence ./cmd/mcp-confluence
 ```
 
 ### Configuring with Claude Code

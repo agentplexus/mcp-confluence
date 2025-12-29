@@ -1,6 +1,6 @@
 # Release Notes - v0.1.0
 
-**Release Date:** December 2024
+**Release Date:** December 29, 2025
 
 ## Overview
 
@@ -77,6 +77,12 @@ The `confluence` package provides a REST API client with:
 **Key guidance:**
 - **Creating pages?** Use blocks - simpler, guaranteed valid output
 - **Editing pages?** Use XHTML - preserves everything, no data loss
+
+## Installation
+
+```bash
+go install github.com/agentplexus/mcp-confluence/cmd/mcp-confluence@latest
+```
 
 ## Configuration
 
