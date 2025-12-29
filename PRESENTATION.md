@@ -4,27 +4,49 @@ theme: agentplexus
 paginate: true
 style: |
   @import '../agentplexus-assets-internal/agentplexus.css';
+  section.section-header {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
+  section.section-header h1 {
+    font-size: 2.5em;
+  }
 ---
+
+<!-- _paginate: false -->
 
 # mcp-confluence
 
-## Building a Reliable MCP Server for Confluence
+## Building a Reliable MCP Server for Confluence 🔧
+
+*How we solved the table corruption problem*
 
 ---
 
-# The Problem
+<!-- _class: section-header -->
 
-AI assistants **corrupt Confluence pages** when editing them
-
-- Tables lose formatting or become invalid
-- Macros break or disappear
-- Content gets mangled on round-trip
-
-This happens with **official MCP servers** and third-party solutions
+# 1️⃣ The Problem
 
 ---
 
-# Why Does This Happen?
+# Real-World Problems 🔥
+
+When we started using existing MCP servers, we discovered:
+
+1. 📊 **Tables** lost formatting or became invalid
+2. 🧩 **Macros** with `ac:` namespaces were stripped or broken
+3. 🔄 **Round-trip editing** (read → modify → write) lost data
+4. 🌐 **Web UI edits** created XHTML the MCP server couldn't parse — even on pages the MCP server originally created
+
+The root cause:
+
+Servers were converting to/from Markdown or HTML5 internally
+
+---
+
+# Why Does This Happen? 🤔
 
 Confluence uses **Storage Format XHTML** - not HTML5, not Markdown
 
@@ -41,26 +63,17 @@ Confluence uses **Storage Format XHTML** - not HTML5, not Markdown
 </table>
 ```
 
-LLMs generate HTML5 or Markdown instead → **instant corruption**
+LLMs generate HTML5 or Markdown instead → **instant corruption** 💥
 
 ---
 
-# Real-World Failures
+<!-- _class: section-header -->
 
-### What we observed:
-
-1. **Tables edited in Atlassian Cloud** couldn't be read back correctly
-2. **Official MCP servers** would corrupt pages on update
-3. **Round-trip editing** (read → modify → write) lost data
-4. **Macros** with `ac:` namespaces were stripped or broken
-
-### The root cause:
-
-Servers were converting to/from Markdown or HTML5 internally
+# 2️⃣ First Approach: Structured Blocks
 
 ---
 
-# Our First Approach: Structured Blocks
+# Structured Blocks 🧱
 
 Idea: Use an **Intermediate Representation (IR)** instead of raw XHTML
 
@@ -76,25 +89,25 @@ page := &storage.Page{
 }
 ```
 
-LLM produces JSON → Go renders valid XHTML
+LLM produces JSON → Go renders valid XHTML ✅
 
 ---
 
-# Structured Blocks: Results
+# Structured Blocks: Results 📊
 
-### What worked:
+### What worked: ✅
 - Creating new pages from scratch
 - Simple tables, lists, headings
 - Guaranteed valid XHTML output
 
-### What didn't work:
+### What didn't work: ❌
 - **Complex tables** lost column widths, styles, attributes
 - **Nested content** in cells (lists, bold, links) was flattened
 - **Round-trip editing** still lost information
 
 ---
 
-# The Core Issue
+# The Core Issue ⚠️
 
 Confluence tables are **much richer** than our IR could represent:
 
@@ -115,95 +128,115 @@ Confluence tables are **much richer** than our IR could represent:
 </table>
 ```
 
-Our IR → `{text: "Bold and links Nested list"}`
+Our block format → `{text: "Bold and links Nested list"}` 😬
 
 ---
 
-# Second Approach: Raw XHTML Tools
+<!-- _class: section-header -->
+
+# 3️⃣ Second Approach: Raw XHTML
+
+---
+
+# Raw XHTML Tools 🛠️
 
 Added tools that work directly with Storage Format XHTML:
 
 | Tool | Description |
 |------|-------------|
-| `confluence_read_page_xhtml` | Get raw XHTML |
-| `confluence_update_page_xhtml` | Update with raw XHTML |
+| `confluence_read_page_xhtml` | 📖 Get raw XHTML |
+| `confluence_update_page_xhtml` | ✏️ Update with raw XHTML |
 
 Let the LLM work with the actual format
 
 ---
 
-# Raw XHTML: Results
+# Raw XHTML: Results 🎯
 
-### What worked:
+### What worked: ✅
 - **Perfect round-trip** - nothing lost
 - **Complex tables** preserved exactly
 - **All attributes** maintained (widths, styles, IDs)
 - **Nested content** kept intact
+- **Still validated** before sending to API
 
-### Tradeoffs:
+### Tradeoffs: ⚖️
 - LLM must understand Storage Format XHTML
 - More tokens in context
 - Risk of LLM generating invalid XHTML
 
 ---
 
-# Current Recommendation
+<!-- _class: section-header -->
 
-## Use XHTML tools for **editing existing pages**
-
-```
-1. confluence_read_page_xhtml  → get raw XHTML
-2. LLM modifies the XHTML string
-3. confluence_update_page_xhtml → save changes
-```
-
-Preserves everything, no data loss
+# 4️⃣ Recommendations
 
 ---
 
-# Current Recommendation
+# Recommendations 🧭
 
-## Use structured blocks for **creating new pages**
-
-```
-1. LLM generates JSON blocks
-2. confluence_create_page → renders valid XHTML
-```
-
-Simpler, guaranteed valid output
-
----
-
-# Decision Matrix
+**Creating pages?** Use blocks ✨ → simpler, guaranteed valid
+**Editing pages?** Use XHTML ✏️ → preserves everything
 
 | Scenario | Recommended Tool |
 |----------|------------------|
-| Create new page | `confluence_create_page` (blocks) |
+| Create new page | `confluence_create_page` (blocks) ✨ |
 | Read simple page | `confluence_read_page` (blocks) |
-| Read complex page | `confluence_read_page_xhtml` |
-| Edit existing page | `confluence_update_page_xhtml` |
-| Edit tables | **Always** `confluence_update_page_xhtml` |
+| Read complex page | `confluence_read_page_xhtml` 📄 |
+| Edit existing page | `confluence_update_page_xhtml` ✏️ |
+| Edit tables | **Always** `confluence_update_page_xhtml` ⚠️ |
 
 ---
 
-# Why Not Always XHTML?
+# Why Not Always XHTML? 🤷
 
 Structured blocks are still valuable:
 
-1. **Safer for creation** - can't produce invalid XHTML
-2. **Easier for LLMs** - JSON is more natural than XHTML
-3. **Validation built-in** - catches errors before API call
-4. **Simpler prompts** - no need to explain Storage Format
+1. 🛡️ **Safer for creation** - can't produce invalid XHTML
+2. 🤖 **Easier for LLMs** - JSON is more natural than XHTML
+3. ⚡ **Faster & cheaper** - XHTML uses more tokens, takes longer
+4. 📋 **Simpler prompts** - no need to explain Storage Format
 
-Use the right tool for the job
+Use the right tool for the job 🔧
 
 ---
 
-# Architecture
+<!-- _class: section-header -->
+
+# 5️⃣ Takeaways
+
+---
+
+# Takeaways 💡
+
+| Challenge | Solution | Lesson |
+|-----------|----------|--------|
+| LLMs generate wrong format | Structured blocks → valid XHTML ✅ | Work with the format, not against it 🎯 |
+| Editing loses formatting | Raw XHTML tools 🔒 | Lossless round-trip is essential 🔄 |
+| Tables break on round-trip | Always use XHTML for edits ⚠️ | Multiple tools > one tool 🧰 |
+| No pre-flight checks | Validate before API calls ✅ | Catch errors early, not in production |
+
+🔗 **github.com/agentplexus/mcp-confluence**
+
+---
+
+<!-- _class: section-header -->
+
+# Questions? 🙋
+
+---
+
+<!-- _class: section-header -->
+
+# Appendix
+
+---
+
+# Architecture 🏗️
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    MCP Server                        │
+│                    MCP Server                       │
 ├─────────────────────────────────────────────────────┤
 │  Structured Tools          │  XHTML Tools           │
 │  ─────────────────         │  ────────────          │
@@ -211,40 +244,9 @@ Use the right tool for the job
 │  update_page (blocks)      │  update_page_xhtml     │
 │  create_page (blocks)      │                        │
 ├─────────────────────────────────────────────────────┤
-│              Confluence REST API Client              │
+│              Confluence REST API Client             │
 ├─────────────────────────────────────────────────────┤
-│                 Storage Package                      │
+│                 Storage Package                     │
 │  Parse (XHTML→IR) │ Render (IR→XHTML) │ Validate    │
 └─────────────────────────────────────────────────────┘
 ```
-
----
-
-# Key Learnings
-
-1. **Don't fight the format** - Confluence uses XHTML, work with it
-2. **Lossless round-trip matters** - users notice when formatting disappears
-3. **Multiple tools > one tool** - different scenarios need different approaches
-4. **Validation is essential** - catch errors before they corrupt pages
-
----
-
-# Summary
-
-| Problem | Solution |
-|---------|----------|
-| LLMs generate wrong format | Structured blocks → valid XHTML |
-| Editing loses formatting | Raw XHTML tools preserve everything |
-| Tables break on round-trip | Always use XHTML for table edits |
-| Official servers corrupt data | We built our own |
-
----
-
-# Links
-
-- **Repository**: github.com/agentplexus/mcp-confluence
-- **Confluence Storage Format**: [Atlassian Docs](https://confluence.atlassian.com/doc/confluence-storage-format-790796544.html)
-
----
-
-# Questions?
