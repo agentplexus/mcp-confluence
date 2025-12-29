@@ -108,7 +108,10 @@ err = client.UpdatePageStorage(ctx, info.ID, page, info.Version, info.Title)
 
 ```bash
 # Build the server
-go build -o confluence-mcp ./cmd/mcp-server
+go build -o mcp-confluence ./cmd/mcp-confluence
+
+# Or use make
+make build
 ```
 
 ### Configuring with Claude Code
@@ -121,7 +124,7 @@ Claude Code supports three configuration scopes. See [Claude Code MCP docs](http
 {
   "mcpServers": {
     "confluence": {
-      "command": "/path/to/confluence-mcp",
+      "command": "/path/to/mcp-confluence",
       "env": {
         "CONFLUENCE_BASE_URL": "https://example.atlassian.net/wiki",
         "CONFLUENCE_USERNAME": "user@example.com",
@@ -138,7 +141,7 @@ Claude Code supports three configuration scopes. See [Claude Code MCP docs](http
 {
   "mcpServers": {
     "confluence": {
-      "command": "/path/to/confluence-mcp",
+      "command": "/path/to/mcp-confluence",
       "env": {
         "CONFLUENCE_BASE_URL": "https://example.atlassian.net/wiki",
         "CONFLUENCE_USERNAME": "user@example.com",
@@ -161,7 +164,7 @@ Add to your Claude Desktop settings (`~/Library/Application Support/Claude/claud
 {
   "mcpServers": {
     "confluence": {
-      "command": "/path/to/confluence-mcp",
+      "command": "/path/to/mcp-confluence",
       "env": {
         "CONFLUENCE_BASE_URL": "https://example.atlassian.net/wiki",
         "CONFLUENCE_USERNAME": "user@example.com",
@@ -187,7 +190,7 @@ export CONFLUENCE_BASE_URL=https://example.atlassian.net/wiki
 export CONFLUENCE_USERNAME=user@example.com
 export CONFLUENCE_API_TOKEN=your-api-token
 
-./confluence-mcp
+./mcp-confluence
 ```
 
 ## MCP Tools
@@ -197,11 +200,21 @@ The MCP server exposes these tools:
 | Tool | Description |
 |------|-------------|
 | `confluence_read_page` | Read a page as structured blocks |
+| `confluence_read_page_xhtml` | Read a page as raw Storage Format XHTML |
 | `confluence_update_page` | Update a page with structured blocks |
+| `confluence_update_page_xhtml` | Update a page with raw Storage Format XHTML |
 | `confluence_create_page` | Create a new page with structured blocks |
 | `confluence_create_table` | Create a table block from structured data |
 | `confluence_delete_page` | Delete a page |
 | `confluence_search_pages` | Search pages using CQL |
+
+### When to Use XHTML Tools
+
+The structured block tools (`confluence_read_page`, `confluence_update_page`) are safer and recommended for most use cases. However, the XHTML tools are useful when:
+
+- **Debugging**: See the raw XHTML to understand parsing issues
+- **Complex content**: Tables with column widths, nested lists, or custom macros that the block parser doesn't fully support
+- **Preserving formatting**: When you need to make small edits without losing inline styles or attributes
 
 ### Example Tool Inputs
 
@@ -215,6 +228,19 @@ The MCP server exposes these tools:
   }
 }
 ```
+
+#### confluence_read_page_xhtml
+
+```json
+{
+  "name": "confluence_read_page_xhtml",
+  "arguments": {
+    "page_id": "12345"
+  }
+}
+```
+
+Returns the raw Storage Format XHTML in the `xhtml` field, along with page metadata.
 
 #### confluence_create_page
 
@@ -251,6 +277,21 @@ The MCP server exposes these tools:
   }
 }
 ```
+
+#### confluence_update_page_xhtml
+
+```json
+{
+  "name": "confluence_update_page_xhtml",
+  "arguments": {
+    "page_id": "12345",
+    "title": "Updated Page Title",
+    "xhtml": "<h1>Updated Content</h1><p>This page has been updated with raw XHTML.</p><table><tbody><tr><th>Name</th><th>Role</th></tr><tr><td>Alice</td><td>Lead</td></tr></tbody></table>"
+  }
+}
+```
+
+Use this when you need to preserve complex formatting that would be lost with structured blocks.
 
 #### confluence_create_table
 
